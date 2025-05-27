@@ -49,10 +49,10 @@ def main(args):
     hid_edge_nn_dim=32
     hid_dim_classifier=64
     
-    pretrain_epoches = 10
+    pretrain_epoches = 3
     num_epoches = 10
     learning_rate = 0.0001  # Reduced from 0.0005
-    bas = 16               # Reduced from 32
+    bas = 32            # Reduced from 32
     
     # Remove unused KL parameters
     torch.manual_seed(0)
