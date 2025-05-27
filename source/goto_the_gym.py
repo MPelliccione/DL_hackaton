@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.utils import to_dense_adj, negative_sampling
+from torch.cuda.amp import autocast, GradScaler
 from my_model import VGAE_all
 import math
 import numpy as np
@@ -141,7 +142,10 @@ class NCODLoss(nn.Module):
 def pretraining(model, td_loader, optimizer, device, cur_epoch):
     model.train()
     total_loss = 0.0
-    scaler = GradScaler()
+    
+    # Only use AMP with CUDA
+    use_amp = device.type == 'cuda'
+    scaler = GradScaler() if use_amp else None
     
     print(f"PRETRAINING: Epoch {cur_epoch + 1}")    
     
@@ -150,30 +154,40 @@ def pretraining(model, td_loader, optimizer, device, cur_epoch):
             data = data.to(device)
             optimizer.zero_grad()
 
-            # Use mixed precision training
-            with autocast():
-                adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=False) 
-
-                if adj_pred is None or torch.isnan(adj_pred).any() or torch.isinf(adj_pred).any():
-                    print(f"Warning: Invalid model output in batch {batch_idx}. Skipping")
-                    continue
-
-                reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, 
-                                                            data.x.size(0), num_neg_samp=1)
-                
+            # Conditionally use mixed precision training
+            if use_amp:
+                with autocast():
+                    adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=False) 
+                    if adj_pred is None or torch.isnan(adj_pred).any() or torch.isinf(adj_pred).any():
+                        print(f"Warning: Invalid model output in batch {batch_idx}. Skipping")
+                        continue
+                    reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, 
+                                                                data.x.size(0), num_neg_samp=1)
                 if torch.isnan(reconstruction_loss) or torch.isinf(reconstruction_loss):
                     print(f"Warning: Invalid loss in batch {batch_idx}. Skipping")
                     continue
-
-            # Scale loss and backprop
-            scaler.scale(reconstruction_loss).backward()
-            
-            # Unscale before gradient clipping
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            
-            scaler.step(optimizer)
-            scaler.update()
+                    
+                # Use scaler for mixed precision
+                scaler.scale(reconstruction_loss).backward()
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                # Regular training path without AMP
+                adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=False)
+                if adj_pred is None or torch.isnan(adj_pred).any() or torch.isinf(adj_pred).any():
+                    print(f"Warning: Invalid model output in batch {batch_idx}. Skipping")
+                    continue
+                reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, 
+                                                            data.x.size(0), num_neg_samp=1)
+                if torch.isnan(reconstruction_loss) or torch.isinf(reconstruction_loss):
+                    print(f"Warning: Invalid loss in batch {batch_idx}. Skipping")
+                    continue
+                    
+                reconstruction_loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer.step()
 
             total_loss += reconstruction_loss.item()
 
