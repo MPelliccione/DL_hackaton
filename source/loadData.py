@@ -12,6 +12,7 @@ from torch_geometric.loader import DataLoader
 class GraphDataset(Dataset):
     def __init__(self, filename, transform=None, pre_transform=None):
         self.raw = filename
+        self.num_graphs, self.graphs_dicts = self._count_graphs()
         self.graphs = self.loadGraphs(self.raw)
         super().__init__(None, transform, pre_transform)
 
@@ -44,15 +45,15 @@ class GraphDataset(Dataset):
         graphs_dicts = None
         try:
             # First try to open as gzip
-            with gzip.open(self.json_path, 'rt', encoding='utf-8') as f:
+            with gzip.open(self.raw, 'rt', encoding='utf-8') as f:  # Changed from self.json_path to self.raw
                 graphs_dicts = json.load(f)
         except gzip.BadGzipFile:
             # If not gzipped, try regular JSON
-            with open(self.json_path, 'r', encoding='utf-8') as f:
+            with open(self.raw, 'r', encoding='utf-8') as f:  # Changed from self.json_path to self.raw
                 graphs_dicts = json.load(f)
                 
         if graphs_dicts is None:
-            raise ValueError(f"Could not load file: {self.json_path}")
+            raise ValueError(f"Could not load file: {self.raw}")
             
         return len(graphs_dicts), graphs_dicts
 
