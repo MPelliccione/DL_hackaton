@@ -8,6 +8,9 @@ from goto_the_gym import pretraining, train
 from utilities import create_dirs, save_checkpoint, add_zeros
 from my_model import VGAE_all, gen_node_features
 
+KAGGLE_DATASET_PATH = "/kaggle/input/ogbg-ppa-dlhackaton"  # Cambia con il nome del tuo dataset
+KAGGLE_OUTPUT_PATH = "/kaggle/working"
+
 def evaluate(data_loader, model, device, calculate_accuracy=False):
     model.eval()
     correct = 0
@@ -45,7 +48,7 @@ def main(args):
     hid_edge_nn_dim=32
     hid_dim_classifier=64
     
-    pretrain_epoches = 20  # previous val: 10
+    pretrain_epoches = 10  # previous val: 10
     num_epoches: int = 10  # previous val: 10
     learning_rate = 0.0005 # previous val: 0.001
     bas = 32 #batch size:  # previous val: 64 
@@ -116,7 +119,7 @@ def main(args):
     # Save predictions to CSV
     test_dir_name = os.path.dirname(args.test_path).split(os.sep)[-1]
     #output_csv_path = os.path.join(f"testset_{test_dir_name}.csv")
-    output_csv_path = os.path.join('/kaggle/working/', f"testset_{test_dir_name}.csv")
+    output_csv_path = os.path.join(KAGGLE_OUTPUT_PATH, f"testset_{test_dir_name}.csv")
     output_df = pd.DataFrame({
         "id": test_graph_ids,
         "pred": predictions
@@ -127,8 +130,11 @@ def main(args):
 # arguments plus call to the main function
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate a classification model on graph datasets.")
-    parser.add_argument("--train_path", type=str, default=None, help="Path to the training dataset (optional).")
-    parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
-    parser.add_argument("--checkpoint_path", type=str, default=None, help="Path to the checkpoint model (e.g. checkpoints/model_B_epoch_10.pth)")
-    args = parser.parse_args()
+    parser.add_argument("--train_path", type=str, 
+                       default=f"{KAGGLE_DATASET_PATH}/train.json.gz")
+    parser.add_argument("--test_path", type=str, 
+                       default=f"{KAGGLE_DATASET_PATH}/test.json.gz")
+    parser.add_argument("--checkpoint_path", type=str, default=None)
+    # Per Kaggle, usa parse_args([]) invece di parse_args()
+    args = parser.parse_args([])
     main(args)
