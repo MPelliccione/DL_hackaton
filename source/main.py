@@ -1,6 +1,7 @@
 import os
 import argparse
 import torch
+import torch.nn as nn
 from torch_geometric.loader import DataLoader
 from loadData import GraphDataset
 import pandas as pd 
@@ -57,16 +58,17 @@ def main(args):
     torch.manual_seed(0)
     
     # Initialize model with weight initialization
-    model = VGAE_all(in_dim, hid_dim, lat_dim, edge_feat_dim, 
-                     hid_edge_nn_dim, out_classes, hid_dim_classifier).to(device)
-
-    # Initialize weights properly
     def init_weights(m):
         if isinstance(m, nn.Linear):
-            torch.nn.init.xavier_uniform_(m.weight)
+            nn.init.xavier_uniform_(m.weight)
             if m.bias is not None:
-                torch.nn.init.zeros_(m.bias)
-            
+                nn.init.zeros_(m.bias)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.ones_(m.weight)
+            nn.init.zeros_(m.bias)
+
+    model = VGAE_all(in_dim, hid_dim, lat_dim, edge_feat_dim, 
+                     hid_edge_nn_dim, out_classes, hid_dim_classifier).to(device)
     model.apply(init_weights)
 
     # Use AdamW instead of Adam
