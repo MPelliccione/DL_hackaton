@@ -120,39 +120,29 @@ class NCODLoss(nn.Module):
 def pretraining(model, td_loader, optimizer, device, kl_weight_max, cur_epoch, an_ep_kl):
     model.train()
     total_loss = 0.0
-
-    # compute dynamic KL weight
-    if cur_epoch < an_ep_kl:
-        kl_weight = kl_weight_max * (cur_epoch / an_ep_kl)
-    else:
-        kl_weight = kl_weight_max
-    # DEBUG PRINT  
-    print(f"PRETRAINING: Epoch {cur_epoch + 1}, KL Weight: {kl_weight:.6f}")    
+    
+    print(f"PRETRAINING: Epoch {cur_epoch + 1}")    
     
     for data in td_loader:
         data = data.to(device)
-        # reset the gradients each batch 
         optimizer.zero_grad()
 
-        # new release update: pass whole data instead of .x ecc.
-        adj_pred,mu,logvar,class_logits, z = model(data, enable_classifier=False) 
+        # Get model outputs including embeddings
+        adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=False) 
 
-        # just a check
-        if adj_pred is None or mu is None or logvar is None:
+        if adj_pred is None:
             print(f"Warning: Model output is None in pretraining epoch {cur_epoch+1}. Skip the batch")
             continue
             
-        #KL term loss
-        kl_term_loss = kl_loss(mu, logvar)
-        #reconstruction loss 
+        # Only reconstruction loss during pretraining
         reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, data.x.size(0), num_neg_samp=1)
-        #total pretraining loss
-        loss = kl_weight*kl_term_loss + reconstruction_loss
+        
+        # Total loss (only reconstruction during pretraining)
+        loss = reconstruction_loss
         loss.backward()
         optimizer.step()
 
-        # accumulate total losses
-        total_loss += loss.item() #* data.num_graphs if hasattr(data, 'num_graphs') else loss.item()#weight per pesare
+        total_loss += loss.item()
 
     return total_loss/len(td_loader)
     
