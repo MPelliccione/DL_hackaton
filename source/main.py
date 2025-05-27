@@ -131,8 +131,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--train_path", type=str,
-                       default=os.path.join(KAGGLE_DATASET_PATH, "A", "0.2_train.json"))
+                       default=os.path.join(KAGGLE_DATASET_PATH, "A", "train.json"))
     parser.add_argument("--test_path", type=str,
-                       default=os.path.join(KAGGLE_DATASET_PATH, "A", "0.2_test.json"))
+                       default=os.path.join(KAGGLE_DATASET_PATH, "A", "test.json"))
     args = parser.parse_args([])  # Empty list for Kaggle notebooks
     main(args)
