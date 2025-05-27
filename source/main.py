@@ -134,6 +134,5 @@ if __name__ == "__main__":
                        default="/kaggle/input/ogbg-ppa-dlhackaton/A/train.json")
     parser.add_argument("--test_path", type=str,
                        default="/kaggle/input/ogbg-ppa-dlhackaton/A/test.json")
-    # For Kaggle notebooks, use empty list
-    args = parser.parse_args([])
+    args = parser.parse_args([])  # Empty list for Kaggle notebooks
     main(args)
