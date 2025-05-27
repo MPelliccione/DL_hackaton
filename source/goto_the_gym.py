@@ -11,12 +11,12 @@ def kl_loss(mu, logvar):
     # clip logvar to avoid extreme values 
     clip_logvar = torch.clamp(logvar, min=-5.0, max=5.0) 
     return -0.5 * torch.mean(1 + clip_logvar -mu.pow(2) - clip_logvar.exp())
-
+"""
 # reconstruction loss function
 def eval_reconstruction_loss(adj_pred, edge_index, num_nodes, num_neg_samp=1):
     positive_logits = adj_pred[edge_index[0], edge_index[1]]
     positive_labels = torch.ones_like(positive_logits)
- """
+
     neg_edge_index = negative_sampling(
         edge_index,
         num_nodes = num_nodes,
