@@ -14,6 +14,9 @@ def kl_loss(mu, logvar):
 """
 # reconstruction loss function
 def eval_reconstruction_loss(adj_pred, edge_index, num_nodes, num_neg_samp=1):
+    # Clamp adjacency predictions to valid range
+    adj_pred = torch.clamp(adj_pred, min=0.0, max=1.0)
+    
     positive_logits = adj_pred[edge_index[0], edge_index[1]]
     positive_labels = torch.ones_like(positive_logits)
 
@@ -21,14 +24,18 @@ def eval_reconstruction_loss(adj_pred, edge_index, num_nodes, num_neg_samp=1):
         edge_index,
         num_nodes = num_nodes,
         num_neg_samples = edge_index.size(1)*num_neg_samp)
-    # as for positive but for negative edges
-    negative_logits = adj_pred[neg_edge_index[0],neg_edge_index[1]]
+        
+    negative_logits = adj_pred[neg_edge_index[0], neg_edge_index[1]]
     negative_labels = torch.zeros_like(negative_logits)
 
     all_the_logits = torch.cat([positive_logits, negative_logits])
     all_the_labels = torch.cat([positive_labels, negative_labels])
 
-    recon_loss = F.binary_cross_entropy(all_the_logits,all_the_labels)
+    # Add small epsilon to avoid log(0)
+    eps = 1e-7
+    all_the_logits = torch.clamp(all_the_logits, min=eps, max=1.0-eps)
+    
+    recon_loss = F.binary_cross_entropy(all_the_logits, all_the_labels)
     return recon_loss
 
 class NCODLoss(nn.Module):
