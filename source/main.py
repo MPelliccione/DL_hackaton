@@ -48,17 +48,18 @@ def main(args):
     hid_edge_nn_dim=32
     hid_dim_classifier=64
     
-    pretrain_epoches = 10  # previous val: 10
-    num_epoches: int = 10  # previous val: 10
-    learning_rate = 0.0005 # previous val: 0.001
-    bas = 32 #batch size:  # previous val: 64 
-    kl_weight_max = 0.01   # weight for KL loss
-    an_ep_kl = 20
+    pretrain_epoches = 10
+    num_epoches = 10
+    learning_rate = 0.0001  # Reduced from 0.0005
+    bas = 16               # Reduced from 32
+    
+    # Remove unused KL parameters
     torch.manual_seed(0)
     
-    # Initialize the model and choose the optimizer
-    model = VGAE_all(in_dim, hid_dim, lat_dim, edge_feat_dim, hid_edge_nn_dim, out_classes, hid_dim_classifier).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    # Initialize model with gradient clipping
+    model = VGAE_all(in_dim, hid_dim, lat_dim, edge_feat_dim, 
+                     hid_edge_nn_dim, out_classes, hid_dim_classifier).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
     node_feat_transf = gen_node_features(feat_dim = in_dim)
 
@@ -84,12 +85,10 @@ def main(args):
             train_loss = pretraining(model, train_loader, optimizer, device, epoch)
             train_accuracy, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             print(f"PRETRAINING: Epoch {epoch + 1}/{pretrain_epoches}, Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}")
-        
 
-        print(f"--- Pre-training Completed ---")
-        # -----------   Training loop   ------------ #
+        # Update train function call to remove KL parameters
         for epoch in range(num_epoches):
-            train_loss = train(model,train_loader, optimizer, device, kl_weight_max, epoch,an_ep_kl)
+            train_loss = train(model, train_loader, optimizer, device, epoch)
             train_accuracy, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             print(f"Epoch {epoch + 1}/{num_epoches}, Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}")
 

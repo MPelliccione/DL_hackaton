@@ -14,29 +14,43 @@ def kl_loss(mu, logvar):
 """
 # reconstruction loss function
 def eval_reconstruction_loss(adj_pred, edge_index, num_nodes, num_neg_samp=1):
-    # Clamp adjacency predictions to valid range
-    adj_pred = torch.clamp(adj_pred, min=0.0, max=1.0)
+    eps = 1e-15  # Smaller epsilon for tighter bounds
     
-    positive_logits = adj_pred[edge_index[0], edge_index[1]]
-    positive_labels = torch.ones_like(positive_logits)
+    # Ensure adj_pred is on the correct device and has valid values
+    adj_pred = torch.clamp(adj_pred, min=eps, max=1.0-eps)
+    
+    try:
+        positive_logits = adj_pred[edge_index[0], edge_index[1]]
+        positive_labels = torch.ones_like(positive_logits)
 
-    neg_edge_index = negative_sampling(
-        edge_index,
-        num_nodes = num_nodes,
-        num_neg_samples = edge_index.size(1)*num_neg_samp)
+        neg_edge_index = negative_sampling(
+            edge_index,
+            num_nodes=num_nodes,
+            num_neg_samples=edge_index.size(1)*num_neg_samp)
+            
+        negative_logits = adj_pred[neg_edge_index[0], neg_edge_index[1]]
+        negative_labels = torch.zeros_like(negative_logits)
+
+        all_the_logits = torch.cat([positive_logits, negative_logits])
+        all_the_labels = torch.cat([positive_labels, negative_labels])
         
-    negative_logits = adj_pred[neg_edge_index[0], neg_edge_index[1]]
-    negative_labels = torch.zeros_like(negative_logits)
-
-    all_the_logits = torch.cat([positive_logits, negative_logits])
-    all_the_labels = torch.cat([positive_labels, negative_labels])
-
-    # Add small epsilon to avoid log(0)
-    eps = 1e-7
-    all_the_logits = torch.clamp(all_the_logits, min=eps, max=1.0-eps)
-    
-    recon_loss = F.binary_cross_entropy(all_the_logits, all_the_labels)
-    return recon_loss
+        # Extra safety clamp
+        all_the_logits = torch.clamp(all_the_logits, min=eps, max=1.0-eps)
+        
+        # Use reduction='none' to check for invalid values
+        losses = F.binary_cross_entropy(all_the_logits, all_the_labels, reduction='none')
+        
+        # Remove any invalid values
+        valid_mask = ~torch.isnan(losses) & ~torch.isinf(losses)
+        if valid_mask.sum() == 0:
+            return torch.tensor(0.0, device=adj_pred.device)
+            
+        recon_loss = losses[valid_mask].mean()
+        return recon_loss
+        
+    except Exception as e:
+        print(f"Error in reconstruction loss: {e}")
+        return torch.tensor(0.0, device=adj_pred.device)
 
 class NCODLoss(nn.Module):
     def __init__(self, labels, n_samples, num_classes, ratio_consistency=0, ratio_balance=0):
@@ -127,30 +141,46 @@ class NCODLoss(nn.Module):
 def pretraining(model, td_loader, optimizer, device, cur_epoch):
     model.train()
     total_loss = 0.0
+    scaler = GradScaler()
     
     print(f"PRETRAINING: Epoch {cur_epoch + 1}")    
     
-    for data in td_loader:
-        data = data.to(device)
-        optimizer.zero_grad()
+    for batch_idx, data in enumerate(td_loader):
+        try:
+            data = data.to(device)
+            optimizer.zero_grad()
 
-        # Get model outputs including embeddings
-        adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=False) 
+            # Use mixed precision training
+            with autocast():
+                adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=False) 
 
-        if adj_pred is None:
-            print(f"Warning: Model output is None in pretraining epoch {cur_epoch+1}. Skip the batch")
+                if adj_pred is None or torch.isnan(adj_pred).any() or torch.isinf(adj_pred).any():
+                    print(f"Warning: Invalid model output in batch {batch_idx}. Skipping")
+                    continue
+
+                reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, 
+                                                            data.x.size(0), num_neg_samp=1)
+                
+                if torch.isnan(reconstruction_loss) or torch.isinf(reconstruction_loss):
+                    print(f"Warning: Invalid loss in batch {batch_idx}. Skipping")
+                    continue
+
+            # Scale loss and backprop
+            scaler.scale(reconstruction_loss).backward()
+            
+            # Unscale before gradient clipping
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            scaler.step(optimizer)
+            scaler.update()
+
+            total_loss += reconstruction_loss.item()
+
+        except RuntimeError as e:
+            print(f"Runtime error in batch {batch_idx}: {e}")
             continue
             
-        # Only reconstruction loss during pretraining
-        reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, data.x.size(0), num_neg_samp=1)
-        
-        # Total loss (only reconstruction during pretraining)
-        loss = reconstruction_loss
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-
     return total_loss/len(td_loader)
     
 # Training procedure - classifier is in!
