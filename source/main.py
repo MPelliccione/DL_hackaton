@@ -56,10 +56,22 @@ def main(args):
     # Remove unused KL parameters
     torch.manual_seed(0)
     
-    # Initialize model with gradient clipping
+    # Initialize model with weight initialization
     model = VGAE_all(in_dim, hid_dim, lat_dim, edge_feat_dim, 
                      hid_edge_nn_dim, out_classes, hid_dim_classifier).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+
+    # Initialize weights properly
+    def init_weights(m):
+        if isinstance(m, nn.Linear):
+            torch.nn.init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                torch.nn.init.zeros_(m.bias)
+            
+    model.apply(init_weights)
+
+    # Use AdamW instead of Adam
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, 
+                            weight_decay=1e-4, amsgrad=True)
 
     node_feat_transf = gen_node_features(feat_dim = in_dim)
 
