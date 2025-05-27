@@ -131,8 +131,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--train_path", type=str,
-                       default="/kaggle/input/ogbg-ppa-dlhackaton/A/train.json")  # Remove .gz
+                       default="/kaggle/input/ogbg-ppa-dlhackaton/A")
     parser.add_argument("--test_path", type=str,
-                       default="/kaggle/input/ogbg-ppa-dlhackaton/A/test.json")   # Remove .gz
+                       default="/kaggle/input/ogbg-ppa-dlhackaton/A")
     args = parser.parse_args([])  # Empty list for Kaggle notebooks
     main(args)
