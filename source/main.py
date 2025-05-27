@@ -46,7 +46,7 @@ def main(args):
     hid_dim_classifier=64
     
     pretrain_epoches = 20  # previous val: 10
-    num_epoches: int = 40  # previous val: 10
+    num_epoches: int = 10  # previous val: 10
     learning_rate = 0.0005 # previous val: 0.001
     bas = 32 #batch size:  # previous val: 64 
     kl_weight_max = 0.01   # weight for KL loss
