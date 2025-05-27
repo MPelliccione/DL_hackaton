@@ -4,8 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.utils import to_dense_adj, negative_sampling
 from my_model import VGAE_all
-
-# our beloved Kullback-Leibler term loss
+import math
+import numpy as np
+""" # our beloved Kullback-Leibler term loss
 def kl_loss(mu, logvar):
     # clip logvar to avoid extreme values 
     clip_logvar = torch.clamp(logvar, min=-5.0, max=5.0) 
@@ -29,6 +30,91 @@ def eval_reconstruction_loss(adj_pred, edge_index, num_nodes, num_neg_samp=1):
 
     recon_loss = F.binary_cross_entropy(all_the_logits,all_the_labels)
     return recon_loss
+ """
+class NCODLoss(nn.Module):
+    def __init__(self, labels, n_samples, num_classes, ratio_consistency=0, ratio_balance=0):
+        super(NCODLoss, self).__init__()
+        self.num_classes = num_classes
+        self.n_samples = n_samples
+        self.ratio_consistency = ratio_consistency
+        self.ratio_balance = ratio_balance
+        
+        # Inizializza u come parametro learnable
+        self.u = nn.Parameter(torch.empty(n_samples, 1, dtype=torch.float32))
+        self.init_param()
+        
+        # Salva labels e crea bins per classe
+        self.labels = labels
+        self.bins = []
+        for i in range(num_classes):
+            self.bins.append(np.where(self.labels == i)[0])
+            
+        # Inizializza embedding memory
+        self.beginning = True
+        self.prev_phi_x_i = torch.rand((n_samples, 512))  # 512 è la dim dell'embedding
+        self.phi_c = torch.rand((num_classes, 512))
+
+    def init_param(self, mean=1e-8, std=1e-9):
+        torch.nn.init.normal_(self.u, mean=mean, std=std)
+        
+    def forward(self, index, logits, y_onehot, phi_x_i, flag=0, epoch=0):
+        eps = 1e-4
+        u = self.u[index].to(logits.device)
+        
+        # Aggiorna i centroidi di classe
+        if flag == 0 and self.beginning:
+            percent = math.ceil((50 - (50 / 5) * epoch) + 50)  # 5 epochs totali
+            for i in range(len(self.bins)):
+                class_u = self.u.detach()[self.bins[i]]
+                bottomK = int((len(class_u) / 100) * percent)
+                important_indexs = torch.topk(class_u, bottomK, largest=False, dim=0)[1]
+                self.phi_c[i] = torch.mean(self.prev_phi_x_i[self.bins[i]][important_indexs.view(-1)], dim=0)
+
+        # Calcola similarità con i centroidi
+        phi_c_norm = self.phi_c.norm(p=2, dim=1, keepdim=True)
+        h_c_bar = self.phi_c.div(phi_c_norm.clamp(min=eps))
+        h_c_bar_T = torch.transpose(h_c_bar, 0, 1)
+
+        # Aggiorna memoria degli embedding
+        self.prev_phi_x_i[index] = phi_x_i.detach()
+
+        # Calcola probabilità e loss
+        f_x_softmax = F.softmax(logits, dim=1)
+        phi_x_i_norm = phi_x_i.detach().norm(p=2, dim=1, keepdim=True)
+        h_i = phi_x_i.detach().div(phi_x_i_norm.clamp(min=eps))
+
+        y_bar = torch.mm(h_i, h_c_bar_T)
+        y_bar = y_bar * y_onehot
+        y_bar_max = (y_bar > 0.000).float()
+        y_bar = y_bar * y_bar_max
+
+        u = u * y_onehot
+        f_x_softmax = torch.clamp(f_x_softmax + u.detach(), min=eps, max=1.0)
+        
+        # Loss principale
+        L1 = torch.mean(-torch.sum(y_bar * torch.log(f_x_softmax), dim=1))
+
+        # Loss aggiuntive
+        y_hat = self.soft_to_hard(logits.detach())
+        L2 = F.mse_loss((y_hat + u), y_onehot, reduction='sum') / len(y_onehot)
+        
+        total_loss = L1 + L2
+
+        # Balance loss opzionale
+        if self.ratio_balance > 0:
+            avg_prediction = torch.mean(f_x_softmax, dim=0)
+            prior_distr = torch.ones_like(avg_prediction) / self.num_classes
+            avg_prediction = torch.clamp(avg_prediction, min=eps, max=1.0)
+            balance_kl = torch.mean(-(prior_distr * torch.log(avg_prediction)).sum(dim=0))
+            total_loss += self.ratio_balance * balance_kl
+
+        return total_loss
+
+    def soft_to_hard(self, x):
+        with torch.no_grad():
+            return torch.zeros(len(x), self.num_classes).to(x.device).scatter_(
+                1, torch.argmax(x, dim=1).view(-1, 1), 1
+            )
 
 # Pre training procedure - no classifiers here
 def pretraining(model, td_loader, optimizer, device, kl_weight_max, cur_epoch, an_ep_kl):
@@ -77,50 +163,38 @@ def train(model, td_loader, optimizer, device, kl_weight_max, cur_epoch, an_ep_k
     total_guessed_pred = 0
     total_worked_graph = 0
     
-    # compute dynamic KL weight
-    if cur_epoch < an_ep_kl:
-        kl_weight = kl_weight_max * (cur_epoch / an_ep_kl)
-    else:
-        kl_weight = kl_weight_max
-    # DEBUG PRINT  
-    print(f"Epoch {cur_epoch + 1}, KL Weight: {kl_weight:.6f}")    
+    # Rimuoviamo il calcolo del KL weight dato che non lo useremo più
+    print(f"Epoch {cur_epoch + 1}")    
     
     for data in td_loader:
         data = data.to(device)
-        # reset the gradients each batch 
         optimizer.zero_grad()
         
-        adj_pred, mu, logvar, class_logits = model(data, enable_classifier=True)
+        # Modifichiamo la chiamata al modello per ricevere anche z
+        adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=True)
 
-        # just a check
-        if adj_pred is None or mu is None or logvar is None:
+        if adj_pred is None:
             print(f"Warning: Model output is None in training epoch {cur_epoch+1}. Skip the batch")
             continue
             
-        #classification loss
-        #DEBUG instead of just data.y
-        if data.y.dim() > 1 and data.y.size(1) == 1:
-            target_y = data.y.squeeze(1)
-        else:
-            target_y = data.y
-        classification_loss = F.cross_entropy(class_logits, target_y) 
+        # NCOD loss
+        batch_indices = torch.arange(data.num_graphs, device=device)
+        y_onehot = F.one_hot(data.y, num_classes=6).float()
+        ncod_loss = train.ncod_criterion(batch_indices, class_logits, y_onehot, z, flag=0, epoch=cur_epoch)
         
-        #KL term loss
-        kl_term_loss = kl_loss(mu, logvar)
-        #reconstruction loss 
+        # Reconstruction loss solo
         reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, data.x.size(0), num_neg_samp=1)
-        #total loss
-        loss = classification_loss + kl_weight*kl_term_loss + reconstruction_loss
+        
+        # Total loss (no more KL)
+        loss = ncod_loss + reconstruction_loss
         loss.backward()
         optimizer.step()
 
-        # accumulate total losses
-        total_loss += loss.item() #* data.num_graphs if hasattr(data, 'num_graphs') else loss.item() # provare weight per pesare
+        total_loss += loss.item()
         
-        #DEBUG evaluate accuracy 
         preds = torch.argmax(class_logits, dim=1)
-        total_guessed_pred += (preds == target_y).sum().item()
-        total_worked_graphs += data.num_graphs 
-        ep_accuracy = total_guessed_pred / total_worked_graphs
+        total_guessed_pred += (preds == data.y).sum().item()
+        total_worked_graph += data.num_graphs 
+        ep_accuracy = total_guessed_pred / total_worked_graph
         
     return total_loss/len(td_loader), ep_accuracy
