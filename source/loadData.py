@@ -32,6 +32,22 @@ class GraphDataset(Dataset):
             graphs.append(dictToGraphObject(graph_dict))
         return graphs
 
+    def _count_graphs(self):
+        graphs_dicts = None
+        try:
+            # First try to open as gzip
+            with gzip.open(self.json_path, 'rt', encoding='utf-8') as f:
+                graphs_dicts = json.load(f)
+        except gzip.BadGzipFile:
+            # If not gzipped, try regular JSON
+            with open(self.json_path, 'r', encoding='utf-8') as f:
+                graphs_dicts = json.load(f)
+                
+        if graphs_dicts is None:
+            raise ValueError(f"Could not load file: {self.json_path}")
+            
+        return len(graphs_dicts), graphs_dicts
+
 
 
 def dictToGraphObject(graph_dict):

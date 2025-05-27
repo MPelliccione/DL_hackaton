@@ -129,12 +129,11 @@ def main(args):
 
 # arguments plus call to the main function
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train and evaluate a classification model on graph datasets.")
-    parser.add_argument("--train_path", type=str, 
-                       default=f"{KAGGLE_DATASET_PATH}/train.json.gz")
-    parser.add_argument("--test_path", type=str, 
-                       default=f"{KAGGLE_DATASET_PATH}/test.json.gz")
-    parser.add_argument("--checkpoint_path", type=str, default=None)
-    # Per Kaggle, usa parse_args([]) invece di parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train_path", type=str,
+                       default="/kaggle/input/ogbg-ppa-dlhackaton/A/train.json")
+    parser.add_argument("--test_path", type=str,
+                       default="/kaggle/input/ogbg-ppa-dlhackaton/A/test.json")
+    # For Kaggle notebooks, use empty list
     args = parser.parse_args([])
     main(args)
