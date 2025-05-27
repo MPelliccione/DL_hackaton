@@ -16,7 +16,7 @@ def kl_loss(mu, logvar):
 def eval_reconstruction_loss(adj_pred, edge_index, num_nodes, num_neg_samp=1):
     positive_logits = adj_pred[edge_index[0], edge_index[1]]
     positive_labels = torch.ones_like(positive_logits)
-
+ """
     neg_edge_index = negative_sampling(
         edge_index,
         num_nodes = num_nodes,
@@ -30,7 +30,7 @@ def eval_reconstruction_loss(adj_pred, edge_index, num_nodes, num_neg_samp=1):
 
     recon_loss = F.binary_cross_entropy(all_the_logits,all_the_labels)
     return recon_loss
- """
+
 class NCODLoss(nn.Module):
     def __init__(self, labels, n_samples, num_classes, ratio_consistency=0, ratio_balance=0):
         super(NCODLoss, self).__init__()
@@ -117,7 +117,7 @@ class NCODLoss(nn.Module):
             )
 
 # Pre training procedure - no classifiers here
-def pretraining(model, td_loader, optimizer, device, kl_weight_max, cur_epoch, an_ep_kl):
+def pretraining(model, td_loader, optimizer, device, cur_epoch):
     model.train()
     total_loss = 0.0
     

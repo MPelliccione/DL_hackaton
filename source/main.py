@@ -81,7 +81,7 @@ def main(args):
         # ----------- pre-training loop ------------ #
         print("\n--- Starting Pre-training of VGAE model ---")
         for epoch in range(pretrain_epoches):
-            train_loss = pretraining(model,train_loader, optimizer, device,kl_weight_max, epoch, an_ep_kl)
+            train_loss = pretraining(model, train_loader, optimizer, device, epoch)
             train_accuracy, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             print(f"PRETRAINING: Epoch {epoch + 1}/{pretrain_epoches}, Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}")
         
