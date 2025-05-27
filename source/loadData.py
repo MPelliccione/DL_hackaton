@@ -11,16 +11,22 @@ from torch_geometric.loader import DataLoader
 
 class GraphDataset(Dataset):
     def __init__(self, filename, transform=None, pre_transform=None):
-        # If filename is a directory, look for json files in it
+        # Handle directory input
         if os.path.isdir(filename):
-            json_files = [f for f in os.listdir(filename) if f.endswith('.json')]
-            if not json_files:
-                json_files = [f for f in os.listdir(filename) if f.endswith('.json.gz')]
-            if not json_files:
-                raise ValueError(f"No JSON files found in directory {filename}")
-            self.raw = os.path.join(filename, json_files[0])
+            directory = filename
+            # Look for jsonl files first, then json, then gz
+            for ext in ['.jsonl', '.json', '.json.gz']:
+                files = [f for f in os.listdir(directory) if f.endswith(ext)]
+                if files:
+                    self.raw = os.path.join(directory, files[0])
+                    break
+            if not hasattr(self, 'raw'):
+                raise ValueError(f"No JSON/JSONL files found in directory {directory}")
         else:
             self.raw = filename
+            
+        if not os.path.isfile(self.raw):
+            raise ValueError(f"File not found: {self.raw}")
             
         super().__init__(None, transform, pre_transform)
         self.graphs = self._load_data()
