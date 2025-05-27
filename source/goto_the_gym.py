@@ -185,44 +185,37 @@ def pretraining(model, td_loader, optimizer, device, cur_epoch):
     return total_loss/valid_batches
     
 # Training procedure - classifier is in!
-def train(model, td_loader, optimizer, device, kl_weight_max, cur_epoch, an_ep_kl):
+def train(model, td_loader, optimizer, device, cur_epoch):
     model.train()
     total_loss = 0.0
-    total_guessed_pred = 0
-    total_worked_graph = 0
+    valid_batches = 0
     
-    # Rimuoviamo il calcolo del KL weight dato che non lo useremo più
-    print(f"Epoch {cur_epoch + 1}")    
-    
-    for data in td_loader:
-        data = data.to(device)
-        optimizer.zero_grad()
-        
-        # Modifichiamo la chiamata al modello per ricevere anche z
-        adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=True)
+    for batch_idx, data in enumerate(td_loader):
+        try:
+            data = data.to(device)
+            optimizer.zero_grad()
+            
+            adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=True)
+            
+            if adj_pred is None:
+                print(f"Warning: Model output is None in batch {batch_idx}. Skipping")
+                continue
+                
+            reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, 
+                                                        data.x.size(0), num_neg_samp=1)
+            
+            loss = reconstruction_loss
+            loss.backward()
+            
+            # Add gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
+            
+            optimizer.step()
+            total_loss += loss.item()
+            valid_batches += 1
 
-        if adj_pred is None:
-            print(f"Warning: Model output is None in training epoch {cur_epoch+1}. Skip the batch")
+        except RuntimeError as e:
+            print(f"Runtime error in batch {batch_idx}: {e}")
             continue
             
-        # NCOD loss
-        batch_indices = torch.arange(data.num_graphs, device=device)
-        y_onehot = F.one_hot(data.y, num_classes=6).float()
-        ncod_loss = train.ncod_criterion(batch_indices, class_logits, y_onehot, z, flag=0, epoch=cur_epoch)
-        
-        # Reconstruction loss solo
-        reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, data.x.size(0), num_neg_samp=1)
-        
-        # Total loss (no more KL)
-        loss = ncod_loss + reconstruction_loss
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-        
-        preds = torch.argmax(class_logits, dim=1)
-        total_guessed_pred += (preds == data.y).sum().item()
-        total_worked_graph += data.num_graphs 
-        ep_accuracy = total_guessed_pred / total_worked_graph
-        
-    return total_loss/len(td_loader), ep_accuracy
+    return total_loss/max(valid_batches, 1)  # Avoid division by zero

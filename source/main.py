@@ -100,17 +100,17 @@ def main(args):
             train_accuracy, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             print(f"PRETRAINING: Epoch {epoch + 1}/{pretrain_epoches}, Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}")
 
-        # Update train function call to remove KL parameters
+        # Training loop without KL parameters
         for epoch in range(num_epoches):
-            train_loss = train(model, train_loader, optimizer, device, epoch)
+            train_loss = train(model, train_loader, optimizer, device, cur_epoch=epoch)
             train_accuracy, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             print(f"Epoch {epoch + 1}/{num_epoches}, Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}")
 
-        # Save the checkpoint if condition
-        if (epoch < 5) or (train_loss < model_loss_min):
-            model_loss_min = train_loss
-            test_dir_name = os.path.basename(os.path.dirname(args.test_path))
-            save_checkpoint(model, test_dir_name, epoch)
+            # Save the checkpoint if condition
+            if (epoch < 5) or (train_loss < model_loss_min):
+                model_loss_min = train_loss
+                test_dir_name = os.path.basename(os.path.dirname(args.test_path))
+                save_checkpoint(model, test_dir_name, epoch)
 
         # SAVE LOGS EACH 10 EPOCHS TO BE COMPLETED 
         #logs/: Log files for each training dataset. Include logs of accuracy and loss recorded every 10 epochs. # usare sempre test_dir_name
