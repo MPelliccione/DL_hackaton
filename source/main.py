@@ -47,6 +47,10 @@ def main(args):
     edge_feat_dim=7
     bas = 32            # Reduced from 32
     
+    pretrain_epochs = 5
+    num_epoches = 5
+    learning_rate = 0.005
+    
     # Remove unused KL parameters
     torch.manual_seed(0)
     
@@ -65,7 +69,7 @@ def main(args):
         hidden_dim=hid_dim,
         edge_feat_dim=edge_feat_dim,
         out_classes=out_classes,
-        n_layers=3
+        n_layers=5
     ).to(device)
     model.apply(init_weights)
 
