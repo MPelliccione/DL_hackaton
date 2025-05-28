@@ -179,36 +179,36 @@ def pretraining(model, td_loader, optimizer, device, cur_epoch):
     return avg_loss
     
 # Training procedure - classifier is in!
-def train(model, td_loader, optimizer, device, cur_epoch):
+def train(model, train_loader, optimizer, device, cur_epoch):
     model.train()
-    total_loss = 0.0
-    valid_batches = 0
-    
-    for batch_idx, data in enumerate(td_loader):
+    total_loss = 0
+    correct = 0
+    total = 0
+
+    for batch_idx, data in enumerate(train_loader):
         try:
             data = data.to(device)
             optimizer.zero_grad()
             
-            # Get predictions with classifier enabled
-            class_logits, _ = model(data)
+            # Forward pass returns only logits and embeddings
+            class_logits, _ = model(data, enable_classifier=True)
             
-            if class_logits is None:
-                print(f"Warning: Model output is None in batch {batch_idx}. Skipping")
-                continue
-            
-            # Classification loss
             loss = F.cross_entropy(class_logits, data.y)
-            
-            # Backprop
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
             optimizer.step()
-            
+
+            # Calculate accuracy
+            pred = class_logits.argmax(dim=1)
+            correct += pred.eq(data.y).sum().item()
+            total += len(data.y)
             total_loss += loss.item()
-            valid_batches += 1
 
         except RuntimeError as e:
             print(f"Runtime error in batch {batch_idx}: {e}")
             continue
-            
-    return total_loss/max(valid_batches, 1)
+
+    avg_loss = total_loss / len(train_loader)
+    accuracy = 100. * correct / total
+    print(f'Epoch: {cur_epoch}, Loss: {avg_loss:.4f}, Train Acc: {accuracy:.4f}%')
+    
+    return avg_loss

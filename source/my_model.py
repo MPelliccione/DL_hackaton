@@ -125,18 +125,16 @@ class GatedGCNPlus(nn.Module):
         for layer in self.layers:
             x = layer(x, edge_index, edge_attr)
         
-        # Edge prediction for pretraining (with gradients)
-        src, dst = edge_index
-        edge_pred = self.decoder(torch.abs(x[src] - x[dst]))
-        adj_pred = edge_pred.squeeze()  # Remove sigmoid here to use BCE with logits
-        
-        # Classification
+        # Different return values based on mode
         if enable_classifier:
+            # For training/inference, return classification logits and embeddings
             graph_embedding = global_mean_pool(x, batch)
             class_logits = self.classifier(graph_embedding)
+            return class_logits, x
         else:
-            class_logits = None
-        
-        # Match old interface: (adj_pred, mu, logvar, class_logits, node_embedding)
-        return adj_pred, None, None, class_logits, x
+            # For pretraining, return edge predictions
+            src, dst = edge_index
+            edge_pred = self.decoder(torch.abs(x[src] - x[dst]))
+            adj_pred = edge_pred.squeeze()
+            return adj_pred, x
 

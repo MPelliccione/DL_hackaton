@@ -47,7 +47,7 @@ def main(args):
     edge_feat_dim=7
     bas = 32            # Reduced from 32
     
-    pretrain_epoches = 4
+    pretrain_epoches = 2
     num_epoches = 5
     learning_rate = 0.005
 
