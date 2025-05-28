@@ -123,7 +123,7 @@ def main(args):
             train_accuracy, train_f1, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             val_accuracy, val_f1, _ = evaluate(val_loader, model, device, calculate_accuracy=True)
             
-            if (epoch + 1) % 5 == 0:
+            if pretrain_epoches < 5 or (epoch + 1) % 5 == 0:
                 print(f"PRETRAINING: Epoch {epoch + 1}/{pretrain_epoches}, Loss: {train_loss:.4f}, "
                       f"Train Acc: {train_accuracy:.4f}, Train F1: {train_f1:.4f}, "
                       f"Val Acc: {val_accuracy:.4f}, Val F1: {val_f1:.4f}")
@@ -137,7 +137,7 @@ def main(args):
             train_accuracy, train_f1, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             val_accuracy, val_f1, _ = evaluate(val_loader, model, device, calculate_accuracy=True)
             
-            if (epoch + 1) % 5 == 0:
+            if num_epoches < 5 or (epoch + 1) % 5 == 0:
                 print(f"Epoch {epoch + 1}/{num_epoches}, Loss: {train_loss:.4f}, "
                       f"Train Acc: {train_accuracy:.4f}, Train F1: {train_f1:.4f}, "
                       f"Val Acc: {val_accuracy:.4f}, Val F1: {val_f1:.4f}")
