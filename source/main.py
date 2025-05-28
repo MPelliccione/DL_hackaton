@@ -46,19 +46,25 @@ def main(args):
     # create directories
     create_dirs()
     
-    # Hyperparameters for the model (circa a ctrl+c - ctrl+v from competiton GitHub)
-    in_dim  = 32           # previous val: 128 i want a faster model
-    hid_dim = 128
-    lat_dim = 16            # 16
-    out_classes = 6
-    edge_feat_dim=7
-    hid_edge_nn_dim=32
-    hid_dim_classifier=64
+    # Hyperparameters optimized for F1 score
+    in_dim = 128          # Increased for richer feature representation
+    hid_dim = 512        # Increased for more complex pattern learning
+    lat_dim = 64         # Increased for better latent space
+    out_classes = 6      # Keep as is (problem specific)
+    edge_feat_dim = 7    # Keep as is (problem specific)
+    hid_edge_nn_dim = 128 # Increased for better edge processing
+    hid_dim_classifier = 256 # Increased for better classification
     
-    pretrain_epoches = 3
-    num_epoches = 3
-    learning_rate = 0.0005 # Reduced from 0.0005
-    bas = 32            # Reduced from 32
+    pretrain_epoches = 10   # More pretraining epochs
+    num_epoches = 20        # More training epochs
+    learning_rate = 0.001   # Higher initial learning rate
+    bas = 128              # Larger batch size
+    dropout_rate = 0.3     # Add dropout for regularization
+    
+    # Add warmup and cosine annealing scheduler
+    warmup_epochs = 3
+    total_steps = (len(train_dataset) // bas) * num_epoches
+    warmup_steps = (len(train_dataset) // bas) * warmup_epochs
     
     # Remove unused KL parameters
     torch.manual_seed(0)
@@ -146,10 +152,21 @@ def main(args):
                       f"Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
 
             # Save the checkpoint if validation accuracy improves
-            if val_accuracy > best_val_accuracy:
-                best_val_accuracy = val_accuracy
+            if val_f1 > best_val_f1:
+                best_val_f1 = val_f1
+                patience_counter = 0
                 test_dir_name = os.path.basename(os.path.dirname(args.test_path))
                 save_checkpoint(model, test_dir_name, epoch)
+            else:
+                patience_counter += 1
+                
+            # Early stopping based on F1 score
+            if patience_counter >= patience:
+                print(f"Early stopping triggered. Best validation F1: {best_val_f1:.4f}")
+                break
+            
+            # Step the scheduler after each batch
+            scheduler.step()
     # Else if train_path NOT provided 
     if not args.train_path:
         checkpoint_path = args.checkpoint
