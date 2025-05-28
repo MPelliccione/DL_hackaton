@@ -68,7 +68,7 @@ def main(args):
     pretrain_epoches = 3   # More pretraining epochs
     num_epoches = 3        # More training epochs
     learning_rate = 0.001   # Higher initial learning rate
-    bas = 128              # Larger batch size
+    bas = 32              # Larger batch size
     dropout_rate = 0.3     # Add dropout for regularization
     
     # Remove unused KL parameters
