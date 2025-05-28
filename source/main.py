@@ -36,6 +36,7 @@ def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("device:", device)
     print(f"Current GPU: {torch.cuda.get_device_name(0)}")
+    print("Edge2Node added")
     
     # create directories
     create_dirs()
@@ -49,8 +50,8 @@ def main(args):
     hid_edge_nn_dim=32
     hid_dim_classifier=64
     
-    pretrain_epoches = 20
-    num_epoches = 20
+    pretrain_epoches = 5
+    num_epoches = 5
     learning_rate = 0.0005 # Reduced from 0.0005
     bas = 32            # Reduced from 32
     
