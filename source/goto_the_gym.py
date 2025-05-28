@@ -146,30 +146,28 @@ def pretraining(model, td_loader, optimizer, device, cur_epoch):
             data = data.to(device)
             optimizer.zero_grad()
 
-            # Regular training without AMP for stability
-            adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=False)
+            # Get edge reconstruction prediction
+            adj_pred, _, _, _, _ = model(data, enable_classifier=False)
             
-            # Debug info
-            if batch_idx == 0:
-                print(f"Debug - adj_pred shape: {adj_pred.shape if adj_pred is not None else None}")
-                print(f"Debug - adj_pred stats: min={adj_pred.min().item() if adj_pred is not None else None}, " 
-                      f"max={adj_pred.max().item() if adj_pred is not None else None}")
-
             if adj_pred is None:
                 print(f"Warning: Model output is None in batch {batch_idx}. Skipping")
                 continue
 
-            # Add gradient clipping
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
-            
-            reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, 
-                                                        data.x.size(0), num_neg_samp=1)
+            # Compute reconstruction loss
+            reconstruction_loss = eval_reconstruction_loss(
+                adj_pred, 
+                data.edge_index, 
+                data.x.size(0), 
+                num_neg_samp=1
+            )
             
             if torch.isnan(reconstruction_loss) or torch.isinf(reconstruction_loss):
                 print(f"Warning: Invalid loss in batch {batch_idx}. Skipping")
                 continue
 
+            # Backprop
             reconstruction_loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
             optimizer.step()
 
             total_loss += reconstruction_loss.item()
@@ -179,10 +177,7 @@ def pretraining(model, td_loader, optimizer, device, cur_epoch):
             print(f"Runtime error in batch {batch_idx}: {e}")
             continue
             
-    if valid_batches == 0:
-        return 0.0
-        
-    return total_loss/valid_batches
+    return total_loss/max(valid_batches, 1)
     
 # Training procedure - classifier is in!
 def train(model, td_loader, optimizer, device, cur_epoch):
@@ -195,22 +190,21 @@ def train(model, td_loader, optimizer, device, cur_epoch):
             data = data.to(device)
             optimizer.zero_grad()
             
-            adj_pred, mu, logvar, class_logits, z = model(data, enable_classifier=True)
+            # Get predictions with classifier enabled
+            class_logits, _ = model(data)
             
-            if adj_pred is None:
+            if class_logits is None:
                 print(f"Warning: Model output is None in batch {batch_idx}. Skipping")
                 continue
-                
-            reconstruction_loss = eval_reconstruction_loss(adj_pred, data.edge_index, 
-                                                        data.x.size(0), num_neg_samp=1)
             
-            loss = reconstruction_loss
+            # Classification loss
+            loss = F.cross_entropy(class_logits, data.y)
+            
+            # Backprop
             loss.backward()
-            
-            # Add gradient clipping
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
-            
             optimizer.step()
+            
             total_loss += loss.item()
             valid_batches += 1
 
@@ -218,4 +212,4 @@ def train(model, td_loader, optimizer, device, cur_epoch):
             print(f"Runtime error in batch {batch_idx}: {e}")
             continue
             
-    return total_loss/max(valid_batches, 1)  # Avoid division by zero
+    return total_loss/max(valid_batches, 1)

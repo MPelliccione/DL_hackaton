@@ -7,7 +7,7 @@ from loadData import GraphDataset
 import pandas as pd 
 from goto_the_gym import pretraining, train
 from utilities import create_dirs, save_checkpoint, add_zeros
-from my_model import VGAE_all, gen_node_features
+from my_model import GatedGCNPlus, gen_node_features
 
 KAGGLE_DATASET_PATH = "/kaggle/input/ogbg-ppa-dlhackaton"
 KAGGLE_OUTPUT_PATH = "/kaggle/working"
@@ -20,7 +20,7 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
     with torch.no_grad():
         for data in data_loader:
             data = data.to(device)
-            output = model(data, enable_classifier=True)
+            output = model(data)
             class_logits = output[3]
             pred = class_logits.argmax(dim=1)
             predictions.extend(pred.cpu().numpy())
@@ -43,15 +43,8 @@ def main(args):
     # Hyperparameters for the model (circa a ctrl+c - ctrl+v from competiton GitHub)
     in_dim  = 32           # previous val: 128 i want a faster model
     hid_dim = 128
-    lat_dim = 16            # 16
     out_classes = 6
     edge_feat_dim=7
-    hid_edge_nn_dim=32
-    hid_dim_classifier=64
-    
-    pretrain_epoches = 20
-    num_epoches = 20
-    learning_rate = 0.0005 # Reduced from 0.0005
     bas = 32            # Reduced from 32
     
     # Remove unused KL parameters
@@ -67,8 +60,13 @@ def main(args):
             nn.init.ones_(m.weight)
             nn.init.zeros_(m.bias)
 
-    model = VGAE_all(in_dim, hid_dim, lat_dim, edge_feat_dim, 
-                     hid_edge_nn_dim, out_classes, hid_dim_classifier).to(device)
+    model = GatedGCNPlus(
+        in_dim=in_dim,
+        hidden_dim=hid_dim,
+        edge_feat_dim=edge_feat_dim,
+        out_classes=out_classes,
+        n_layers=3
+    ).to(device)
     model.apply(init_weights)
 
     # Use AdamW instead of Adam
@@ -94,7 +92,7 @@ def main(args):
         train_loader = DataLoader(train_dataset, batch_size=bas, shuffle=True)
 
         # ----------- pre-training loop ------------ #
-        print("\n--- Starting Pre-training of VGAE model ---")
+        print("\n--- Starting Pre-training of GatedGCN+ model ---")
         for epoch in range(pretrain_epoches):
             train_loss = pretraining(model, train_loader, optimizer, device, epoch)
             train_accuracy, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
