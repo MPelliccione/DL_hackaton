@@ -58,7 +58,7 @@ def main(args):
     
     # Hyperparameters optimized for F1 score
     in_dim = 32          # Increased for richer feature representation
-    hid_dim = 256        # Increased for more complex pattern learning
+    hid_dim = 128        # Increased for more complex pattern learning
     lat_dim = 32         # Increased for better latent space
     out_classes = 6      # Keep as is (problem specific)
     edge_feat_dim = 7    # Keep as is (problem specific)
