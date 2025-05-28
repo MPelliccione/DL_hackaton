@@ -57,16 +57,16 @@ def main(args):
     create_dirs()
     
     
-    in_dim = 8          # Increased for richer feature representation
+    in_dim = 16          # Increased for richer feature representation
     hid_dim = 128        # Increased for more complex pattern learning
-    lat_dim = 16         # Increased for better latent space
+    lat_dim = 32         # Increased for better latent space
     out_classes = 6      # Keep as is (problem specific)
     edge_feat_dim = 7    # Keep as is (problem specific)
     hid_edge_nn_dim = 64 # Increased for better edge processing
     hid_dim_classifier = 64 # Increased for better classification
     
-    pretrain_epoches = 1  # More pretraining epochs
-    num_epoches = 3        # More training epochs
+    pretrain_epoches = 20 # More pretraining epochs
+    num_epoches = 30        # More training epochs
     learning_rate = 0.001   # Higher initial learning rate
     bas = 32              # Larger batch size
     dropout_rate = 0.3     # Add dropout for regularization
