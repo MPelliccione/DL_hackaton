@@ -31,12 +31,15 @@ class gen_node_features(object):
 class VGAE_encoder(nn.Module):   #- DA FARE CHECK 
     def __init__(self, in_dim, hid_dim, lat_dim, edge_feat_dim, hid_edge_nn_dim=32):
         super().__init__()
+        # Add edge2node transformation
+        self.edge2node = Edge2NodeFeatures(edge_feat_dim, in_dim)
+        
         nn1_edge_maps = nn.Sequential(
             nn.Linear(edge_feat_dim, hid_edge_nn_dim),
             nn.ReLU(),
-            nn.Linear(hid_edge_nn_dim, in_dim*hid_dim)    # to check this
+            nn.Linear(hid_edge_nn_dim, in_dim*hid_dim)
         )
-        self.conv1 = NNConv(in_dim, hid_dim, nn1_edge_maps, aggr='mean') #try with sum
+        self.conv1 = NNConv(in_dim, hid_dim, nn1_edge_maps, aggr='mean')
         nn_mu_edge_maps = nn.Sequential(
             nn.Linear(edge_feat_dim, hid_edge_nn_dim),
             nn.ReLU(),
@@ -52,6 +55,13 @@ class VGAE_encoder(nn.Module):   #- DA FARE CHECK
         self.dropout = nn.Dropout(0.2) # 20% dropout
         
     def forward(self, x, edge_index, edge_attr):
+        # Get edge2node features
+        edge2node_features = self.edge2node(edge_attr, edge_index, x.size(0))
+        
+        # Combine original node features with edge2node features
+        x = x + edge2node_features
+        
+        # Continue with regular forward pass
         h = F.relu(self.conv1(x, edge_index, edge_attr))
         h = self.dropout(h)
         # compute node level mean and logvar
@@ -111,4 +121,34 @@ class VGAE_all(nn.Module):
             class_logits = None
             
         return adj_pred, mu, logvar, class_logits, z
+
+class Edge2NodeFeatures(nn.Module):
+    def __init__(self, edge_feat_dim, node_feat_dim):
+        super().__init__()
+        self.edge_transform = nn.Sequential(
+            nn.Linear(edge_feat_dim, node_feat_dim),
+            nn.ReLU(),
+            nn.LayerNorm(node_feat_dim)
+        )
         
+    def forward(self, edge_attr, edge_index, num_nodes):
+        # Transform edge features
+        transformed_edge_features = self.edge_transform(edge_attr)
+        
+        # Aggregate edge features for each node
+        node_features = torch.zeros((num_nodes, transformed_edge_features.size(1)), 
+                                  device=edge_attr.device)
+        
+        # Add incoming edge features to nodes
+        node_features.index_add_(0, edge_index[1], transformed_edge_features)
+        # Add outgoing edge features to nodes
+        node_features.index_add_(0, edge_index[0], transformed_edge_features)
+        
+        # Normalize by degree (number of edges per node)
+        degree = torch.zeros(num_nodes, device=edge_attr.device)
+        degree.index_add_(0, edge_index[0], torch.ones_like(edge_index[0], dtype=torch.float))
+        degree.index_add_(0, edge_index[1], torch.ones_like(edge_index[1], dtype=torch.float))
+        degree = degree.clamp(min=1).unsqueeze(1)
+        
+        return node_features / degree
+
