@@ -31,6 +31,15 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
         return accuracy, predictions
     return predictions
 
+def parse_path(path):
+    """Convert path to absolute path and handle both file and directory inputs"""
+    if path is None:
+        return None
+    abs_path = os.path.abspath(os.path.expanduser(path))
+    if os.path.exists(abs_path):
+        return abs_path
+    raise FileNotFoundError(f"Path does not exist: {abs_path}")
+
 def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("device:", device)
@@ -82,14 +91,21 @@ def main(args):
     # TO BE IMPLEMENTED FOR LOGS AT LEAST 10
     logs_counter = 0
     
+    # Convert paths to absolute paths
+    test_path = parse_path(args.test_path)
+    train_path = parse_path(args.train_path) if args.train_path else None
+    
+    print(f"Using test path: {test_path}")
+    print(f"Using train path: {train_path}")
+    
     # Prepare test dataset and loader
-    test_dataset = GraphDataset(args.test_path, transform=node_feat_transf) #add_zeros
+    test_dataset = GraphDataset(test_path, transform=node_feat_transf) #add_zeros
     test_loader = DataLoader(test_dataset, batch_size=bas, shuffle=False)
 
     # If train_path is provided then train on it 
     if args.train_path:
         print(f">> Starting the train of the model using the following train set: {args.train_path}")
-        train_dataset = GraphDataset(args.train_path, transform=node_feat_transf) #add_zeros
+        train_dataset = GraphDataset(train_path, transform=node_feat_transf) #add_zeros
         train_loader = DataLoader(train_dataset, batch_size=bas, shuffle=True)
 
         # ----------- pre-training loop ------------ #
@@ -141,10 +157,10 @@ def main(args):
 
 # arguments plus call to the main function
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--train_path", type=str
-                      )
-    parser.add_argument("--test_path", type=str
-                      )
-    args = parser.parse_args([])  # Empty list for Kaggle notebooks
+    parser = argparse.ArgumentParser(description='Graph Classification Model Training')
+    parser.add_argument('--test_path', type=str, required=True,
+                      help='Path to the test dataset')
+    parser.add_argument('--train_path', type=str,
+                      help='Path to the training dataset (optional)')
+    args = parser.parse_args()
     main(args)
