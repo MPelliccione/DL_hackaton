@@ -91,31 +91,48 @@ def main(args):
     # If train_path is provided then train on it 
     if args.train_path:
         print(f">> Starting the train of the model using the following train set: {args.train_path}")
-        train_dataset = GraphDataset(args.train_path, transform=node_feat_transf) #add_zeros
+        full_dataset = GraphDataset(args.train_path, transform=node_feat_transf)
+        
+        # Calculate split sizes
+        dataset_size = len(full_dataset)
+        val_size = int(0.2 * dataset_size)
+        train_size = dataset_size - val_size
+        
+        # Split the dataset
+        train_dataset, val_dataset = torch.utils.data.random_split(
+            full_dataset, 
+            [train_size, val_size],
+            generator=torch.Generator().manual_seed(42)
+        )
+        
         train_loader = DataLoader(train_dataset, batch_size=bas, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=bas, shuffle=False)
+
+        print(f"Training set size: {train_size}, Validation set size: {val_size}")
 
         # ----------- pre-training loop ------------ #
         print("\n--- Starting Pre-training of VGAE model ---")
+        best_val_accuracy = 0.0
         for epoch in range(pretrain_epoches):
             train_loss = pretraining(model, train_loader, optimizer, device, epoch)
             train_accuracy, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
-            print(f"PRETRAINING: Epoch {epoch + 1}/{pretrain_epoches}, Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}")
+            val_accuracy, _ = evaluate(val_loader, model, device, calculate_accuracy=True)
+            print(f"PRETRAINING: Epoch {epoch + 1}/{pretrain_epoches}, Loss: {train_loss:.4f}, "
+                  f"Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
 
         # Training loop without KL parameters
         for epoch in range(num_epoches):
             train_loss = train(model, train_loader, optimizer, device, cur_epoch=epoch)
             train_accuracy, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
-            print(f"Epoch {epoch + 1}/{num_epoches}, Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}")
+            val_accuracy, _ = evaluate(val_loader, model, device, calculate_accuracy=True)
+            print(f"Epoch {epoch + 1}/{num_epoches}, Loss: {train_loss:.4f}, "
+                  f"Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
 
-            # Save the checkpoint if condition
-            if (epoch < 5) or (train_loss < model_loss_min):
-                model_loss_min = train_loss
+            # Save the checkpoint if validation accuracy improves
+            if val_accuracy > best_val_accuracy:
+                best_val_accuracy = val_accuracy
                 test_dir_name = os.path.basename(os.path.dirname(args.test_path))
                 save_checkpoint(model, test_dir_name, epoch)
-
-        # SAVE LOGS EACH 10 EPOCHS TO BE COMPLETED 
-        #logs/: Log files for each training dataset. Include logs of accuracy and loss recorded every 10 epochs. # usare sempre test_dir_name
-        
     # Else if train_path NOT provided 
     if not args.train_path:
         checkpoint_path = args.checkpoint
