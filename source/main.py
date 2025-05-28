@@ -55,8 +55,8 @@ def main(args):
     hid_edge_nn_dim=32
     hid_dim_classifier=64
     
-    pretrain_epoches = 20
-    num_epoches = 20
+    pretrain_epoches = 3
+    num_epoches = 3
     learning_rate = 0.0005 # Reduced from 0.0005
     bas = 32            # Reduced from 32
     
