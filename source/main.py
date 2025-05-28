@@ -13,6 +13,16 @@ from sklearn.metrics import f1_score
 KAGGLE_DATASET_PATH = "/kaggle/input/ogbg-ppa-dlhackaton"
 KAGGLE_OUTPUT_PATH = "/kaggle/working"
 
+def init_weights(m):
+    """Initialize network weights using Xavier initialization"""
+    if isinstance(m, (nn.Linear, nn.Conv2d)):
+        nn.init.xavier_uniform_(m.weight)
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+    elif isinstance(m, nn.BatchNorm2d):
+        nn.init.ones_(m.weight)
+        nn.init.zeros_(m.bias)
+
 def evaluate(data_loader, model, device, calculate_accuracy=False):
     model.eval()
     correct = 0
