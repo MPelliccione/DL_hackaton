@@ -9,8 +9,7 @@ from goto_the_gym import pretraining, train
 from utilities import create_dirs, save_checkpoint, add_zeros
 from my_model import VGAE_all, gen_node_features
 
-KAGGLE_DATASET_PATH = "/kaggle/input/ogbg-ppa-dlhackaton"
-KAGGLE_OUTPUT_PATH = "/kaggle/working"
+
 
 def evaluate(data_loader, model, device, calculate_accuracy=False):
     model.eval()
@@ -143,9 +142,9 @@ def main(args):
 # arguments plus call to the main function
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--train_path", type=str,
-                       default=os.path.join(KAGGLE_DATASET_PATH, "A", "train.json"))
-    parser.add_argument("--test_path", type=str,
-                       default=os.path.join(KAGGLE_DATASET_PATH, "A", "test.json"))
+    parser.add_argument("--train_path", type=str
+                      )
+    parser.add_argument("--test_path", type=str
+                      )
     args = parser.parse_args([])  # Empty list for Kaggle notebooks
     main(args)
