@@ -125,7 +125,7 @@ class GatedGCNPlus(nn.Module):
         for layer in self.layers:
             x = layer(x, edge_index, edge_attr)
         
-        # Reconstruction for pretraining
+        # Edge prediction for pretraining
         src, dst = edge_index
         edge_pred = self.decoder(torch.abs(x[src] - x[dst]))
         adj_pred = torch.sigmoid(edge_pred).squeeze()
@@ -137,6 +137,6 @@ class GatedGCNPlus(nn.Module):
         else:
             class_logits = None
         
-        # Return format: adj_pred, mu, logvar, class_logits, z
-        return class_logits, x  # GatedGCN+ style
+        # Match old interface: (adj_pred, mu, logvar, class_logits, node_embedding)
+        return adj_pred, None, None, class_logits, x
 

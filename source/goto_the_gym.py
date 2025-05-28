@@ -147,7 +147,8 @@ def pretraining(model, td_loader, optimizer, device, cur_epoch):
             optimizer.zero_grad()
 
             # Get edge reconstruction prediction
-            adj_pred, _, _, _, _ = model(data, enable_classifier=False)
+            outputs = model(data, enable_classifier=False)
+            adj_pred = outputs[0]  # Only use the first return value
             
             if adj_pred is None:
                 print(f"Warning: Model output is None in batch {batch_idx}. Skipping")
