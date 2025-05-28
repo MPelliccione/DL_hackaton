@@ -135,6 +135,7 @@ class NCODLoss(nn.Module):
 
 # Pre training procedure - no classifiers here
 def pretraining(model, td_loader, optimizer, device, cur_epoch):
+    """Modified pretraining using edge prediction loss"""
     model.train()
     total_loss = 0.0
     valid_batches = 0
@@ -146,39 +147,36 @@ def pretraining(model, td_loader, optimizer, device, cur_epoch):
             data = data.to(device)
             optimizer.zero_grad()
 
-            # Get edge reconstruction prediction
-            outputs = model(data, enable_classifier=False)
-            adj_pred = outputs[0]  # Only use the first return value
+            # Forward pass without classification
+            adj_pred, _, _, _, _ = model(data, enable_classifier=False)
             
+            # Skip if no valid prediction
             if adj_pred is None:
-                print(f"Warning: Model output is None in batch {batch_idx}. Skipping")
                 continue
 
-            # Compute reconstruction loss
-            reconstruction_loss = eval_reconstruction_loss(
-                adj_pred, 
-                data.edge_index, 
-                data.x.size(0), 
-                num_neg_samp=1
-            )
+            # Edge prediction loss
+            edge_mask = torch.rand(adj_pred.size(0), device=device) < 0.5
+            edge_pred = adj_pred[edge_mask]
+            edge_true = (data.edge_index[0] == data.edge_index[1])[edge_mask].float()
             
-            if torch.isnan(reconstruction_loss) or torch.isinf(reconstruction_loss):
-                print(f"Warning: Invalid loss in batch {batch_idx}. Skipping")
-                continue
-
-            # Backprop
-            reconstruction_loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
-            optimizer.step()
-
-            total_loss += reconstruction_loss.item()
-            valid_batches += 1
+            loss = F.binary_cross_entropy_with_logits(edge_pred, edge_true)
+            
+            # Backprop if loss is valid
+            if not torch.isnan(loss) and not torch.isinf(loss):
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
+                optimizer.step()
+                
+                total_loss += loss.item()
+                valid_batches += 1
 
         except RuntimeError as e:
             print(f"Runtime error in batch {batch_idx}: {e}")
             continue
             
-    return total_loss/max(valid_batches, 1)
+    avg_loss = total_loss/max(valid_batches, 1)
+    print(f"PRETRAINING: Epoch {cur_epoch + 1}, Average Loss: {avg_loss:.4f}")
+    return avg_loss
     
 # Training procedure - classifier is in!
 def train(model, td_loader, optimizer, device, cur_epoch):

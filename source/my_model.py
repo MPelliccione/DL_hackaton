@@ -125,10 +125,10 @@ class GatedGCNPlus(nn.Module):
         for layer in self.layers:
             x = layer(x, edge_index, edge_attr)
         
-        # Edge prediction for pretraining
+        # Edge prediction for pretraining (with gradients)
         src, dst = edge_index
         edge_pred = self.decoder(torch.abs(x[src] - x[dst]))
-        adj_pred = torch.sigmoid(edge_pred).squeeze()
+        adj_pred = edge_pred.squeeze()  # Remove sigmoid here to use BCE with logits
         
         # Classification
         if enable_classifier:
