@@ -65,7 +65,7 @@ def main(args):
     hid_edge_nn_dim = 64 # Increased for better edge processing
     hid_dim_classifier = 64 # Increased for better classification
     
-    pretrain_epoches = 3   # More pretraining epochs
+    pretrain_epoches = 1  # More pretraining epochs
     num_epoches = 3        # More training epochs
     learning_rate = 0.001   # Higher initial learning rate
     bas = 32              # Larger batch size
