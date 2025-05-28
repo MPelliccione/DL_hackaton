@@ -148,6 +148,11 @@ def main(args):
                       f"Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
 
         # Training loop without KL parameters
+        # Initialize training variables
+        best_val_f1 = 0.0
+        patience = 5  # Add patience parameter for early stopping
+        patience_counter = 0
+        
         for epoch in range(num_epoches):
             train_loss = train(model, train_loader, optimizer, device, cur_epoch=epoch)
             train_accuracy, train_f1, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
