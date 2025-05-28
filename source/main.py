@@ -59,11 +59,11 @@ def main(args):
     
     in_dim = 8          # Increased for richer feature representation
     hid_dim = 128        # Increased for more complex pattern learning
-    lat_dim = 32         # Increased for better latent space
+    lat_dim = 16         # Increased for better latent space
     out_classes = 6      # Keep as is (problem specific)
     edge_feat_dim = 7    # Keep as is (problem specific)
     hid_edge_nn_dim = 64 # Increased for better edge processing
-    hid_dim_classifier = 128 # Increased for better classification
+    hid_dim_classifier = 64 # Increased for better classification
     
     pretrain_epoches = 3   # More pretraining epochs
     num_epoches = 3        # More training epochs
