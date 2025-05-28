@@ -147,27 +147,26 @@ def pretraining(model, td_loader, optimizer, device, cur_epoch):
             data = data.to(device)
             optimizer.zero_grad()
 
-            # Forward pass without classification
-            adj_pred, _, _, _, _ = model(data, enable_classifier=False)
+            # Model now returns (adj_pred, embeddings) tuple when enable_classifier=False
+            adj_pred, _ = model(data, enable_classifier=False)
             
             # Skip if no valid prediction
             if adj_pred is None:
                 continue
 
-            # Edge prediction loss
-            edge_mask = torch.rand(adj_pred.size(0), device=device) < 0.5
-            edge_pred = adj_pred[edge_mask]
-            edge_true = (data.edge_index[0] == data.edge_index[1])[edge_mask].float()
-            
-            loss = F.binary_cross_entropy_with_logits(edge_pred, edge_true)
+            # Compute reconstruction loss
+            recon_loss = eval_reconstruction_loss(
+                adj_pred, 
+                data.edge_index,
+                data.x.size(0)
+            )
             
             # Backprop if loss is valid
-            if not torch.isnan(loss) and not torch.isinf(loss):
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
+            if not torch.isnan(recon_loss) and not torch.isinf(recon_loss):
+                recon_loss.backward()
                 optimizer.step()
                 
-                total_loss += loss.item()
+                total_loss += recon_loss.item()
                 valid_batches += 1
 
         except RuntimeError as e:
@@ -175,7 +174,6 @@ def pretraining(model, td_loader, optimizer, device, cur_epoch):
             continue
             
     avg_loss = total_loss/max(valid_batches, 1)
-    print(f"PRETRAINING: Epoch {cur_epoch + 1}, Average Loss: {avg_loss:.4f}")
     return avg_loss
     
 # Training procedure - classifier is in!

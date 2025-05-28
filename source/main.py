@@ -20,8 +20,8 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
     with torch.no_grad():
         for data in data_loader:
             data = data.to(device)
-            output = model(data)
-            class_logits = output[3]
+            # Model now returns (logits, embeddings) tuple
+            class_logits, _ = model(data)
             pred = class_logits.argmax(dim=1)
             predictions.extend(pred.cpu().numpy())
             if calculate_accuracy:
