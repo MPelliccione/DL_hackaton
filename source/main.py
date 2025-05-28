@@ -47,10 +47,10 @@ def main(args):
     edge_feat_dim=7
     bas = 32            # Reduced from 32
     
-    pretrain_epochs = 5
+    pretrain_epoches = 4
     num_epoches = 5
     learning_rate = 0.005
-    
+
     # Remove unused KL parameters
     torch.manual_seed(0)
     
