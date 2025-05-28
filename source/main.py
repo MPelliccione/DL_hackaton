@@ -8,6 +8,7 @@ import pandas as pd
 from goto_the_gym import pretraining, train
 from utilities import create_dirs, save_checkpoint, add_zeros
 from my_model import VGAE_all, gen_node_features
+from sklearn.metrics import f1_score
 
 KAGGLE_DATASET_PATH = "/kaggle/input/ogbg-ppa-dlhackaton"
 KAGGLE_OUTPUT_PATH = "/kaggle/working"
@@ -17,6 +18,7 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
     correct = 0
     total = 0
     predictions = []
+    true_labels = []
     with torch.no_grad():
         for data in data_loader:
             data = data.to(device)
@@ -27,9 +29,12 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
             if calculate_accuracy:
                 correct += (pred == data.y).sum().item()
                 total += data.y.size(0)
+                true_labels.extend(data.y.cpu().numpy())
+    
     if calculate_accuracy:
         accuracy = correct / total
-        return accuracy, predictions
+        f1 = f1_score(true_labels, predictions, average='weighted')
+        return accuracy, f1, predictions
     return predictions
 
 def main(args):
@@ -115,18 +120,30 @@ def main(args):
         best_val_accuracy = 0.0
         for epoch in range(pretrain_epoches):
             train_loss = pretraining(model, train_loader, optimizer, device, epoch)
-            train_accuracy, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
-            val_accuracy, _ = evaluate(val_loader, model, device, calculate_accuracy=True)
-            print(f"PRETRAINING: Epoch {epoch + 1}/{pretrain_epoches}, Loss: {train_loss:.4f}, "
-                  f"Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
+            train_accuracy, train_f1, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
+            val_accuracy, val_f1, _ = evaluate(val_loader, model, device, calculate_accuracy=True)
+            
+            if (epoch + 1) % 5 == 0:
+                print(f"PRETRAINING: Epoch {epoch + 1}/{pretrain_epoches}, Loss: {train_loss:.4f}, "
+                      f"Train Acc: {train_accuracy:.4f}, Train F1: {train_f1:.4f}, "
+                      f"Val Acc: {val_accuracy:.4f}, Val F1: {val_f1:.4f}")
+            else:
+                print(f"PRETRAINING: Epoch {epoch + 1}/{pretrain_epoches}, Loss: {train_loss:.4f}, "
+                      f"Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
 
         # Training loop without KL parameters
         for epoch in range(num_epoches):
             train_loss = train(model, train_loader, optimizer, device, cur_epoch=epoch)
-            train_accuracy, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
-            val_accuracy, _ = evaluate(val_loader, model, device, calculate_accuracy=True)
-            print(f"Epoch {epoch + 1}/{num_epoches}, Loss: {train_loss:.4f}, "
-                  f"Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
+            train_accuracy, train_f1, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
+            val_accuracy, val_f1, _ = evaluate(val_loader, model, device, calculate_accuracy=True)
+            
+            if (epoch + 1) % 5 == 0:
+                print(f"Epoch {epoch + 1}/{num_epoches}, Loss: {train_loss:.4f}, "
+                      f"Train Acc: {train_accuracy:.4f}, Train F1: {train_f1:.4f}, "
+                      f"Val Acc: {val_accuracy:.4f}, Val F1: {val_f1:.4f}")
+            else:
+                print(f"Epoch {epoch + 1}/{num_epoches}, Loss: {train_loss:.4f}, "
+                      f"Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
 
             # Save the checkpoint if validation accuracy improves
             if val_accuracy > best_val_accuracy:
