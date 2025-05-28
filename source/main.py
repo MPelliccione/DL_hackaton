@@ -41,17 +41,17 @@ def main(args):
     create_dirs()
     
     # Hyperparameters for the model (circa a ctrl+c - ctrl+v from competiton GitHub)
-    in_dim  = 32           # previous val: 128 i want a faster model
+    in_dim  = 128          # previous val: 128 i want a faster model
     hid_dim = 128
-    lat_dim = 8            # 16
+    lat_dim = 16            # 16
     out_classes = 6
     edge_feat_dim=7
     hid_edge_nn_dim=32
     hid_dim_classifier=64
     
-    pretrain_epoches = 3
-    num_epoches = 10
-    learning_rate = 0.0001  # Reduced from 0.0005
+    pretrain_epoches = 20
+    num_epoches = 20
+    learning_rate = 0.0005  # Reduced from 0.0005
     bas = 32            # Reduced from 32
     
     # Remove unused KL parameters
