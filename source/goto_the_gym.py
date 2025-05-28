@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.utils import to_dense_adj, negative_sampling
 from torch.cuda.amp import autocast, GradScaler
-from my_model import VGAE_all
+from my_model import GatedGCNPlus
 import math
 import numpy as np
 """ # our beloved Kullback-Leibler term loss
