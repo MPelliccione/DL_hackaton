@@ -18,7 +18,7 @@ class gen_node_features(object):
                 num_nodes = data.edge_index.max().item() + 1
             
             if num_nodes > 0:
-                data.x = torch.randn((num_nodes, self.feat_dim), dtype=torch.float)
+                data.x = torch.ones((num_nodes, self.feat_dim), dtype=torch.float)
             else:
                 # Se non ci sono nodi validi o edge_index, crea un tensore vuoto per data.x
                 data.x = torch.empty((0, self.feat_dim), dtype=torch.float)

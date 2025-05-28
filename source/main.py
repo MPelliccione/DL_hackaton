@@ -61,32 +61,17 @@ def main(args):
     bas = 128              # Larger batch size
     dropout_rate = 0.3     # Add dropout for regularization
     
-    # Add warmup and cosine annealing scheduler
-    warmup_epochs = 3
-    total_steps = (len(train_dataset) // bas) * num_epoches
-    warmup_steps = (len(train_dataset) // bas) * warmup_epochs
-    
     # Remove unused KL parameters
     torch.manual_seed(0)
     
-    # Initialize model with weight initialization
-    def init_weights(m):
-        if isinstance(m, nn.Linear):
-            nn.init.xavier_uniform_(m.weight)
-            if m.bias is not None:
-                nn.init.zeros_(m.bias)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.ones_(m.weight)
-            nn.init.zeros_(m.bias)
-
+    # Initialize model and optimizer first
     model = VGAE_all(in_dim, hid_dim, lat_dim, edge_feat_dim, 
                      hid_edge_nn_dim, out_classes, hid_dim_classifier).to(device)
     model.apply(init_weights)
-
-    # Use AdamW instead of Adam
+    
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, 
                             weight_decay=1e-4, amsgrad=True)
-
+    
     node_feat_transf = gen_node_features(feat_dim = in_dim)
 
     # checkpoints saving threshold on training loss - if have time implement this on acc or validation
@@ -116,6 +101,21 @@ def main(args):
             generator=torch.Generator().manual_seed(42)
         )
         
+        # Now we can initialize the scheduler after dataset is created
+        warmup_epochs = 3
+        total_steps = (len(train_dataset) // bas) * num_epoches
+        warmup_steps = (len(train_dataset) // bas) * warmup_epochs
+        
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=learning_rate,
+            total_steps=total_steps,
+            pct_start=warmup_steps/total_steps,
+            anneal_strategy='cos',
+            cycle_momentum=False
+        )
+        
+        # Continue with the rest of the training code
         train_loader = DataLoader(train_dataset, batch_size=bas, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=bas, shuffle=False)
 
